@@ -148,6 +148,7 @@ private:
     std::vector<VkImageView> swapchainImageViews;
     VkPipeline graphicsPipeline;
     VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorSetLayout vertexBufferDescriptorSetLayout;
     VkPipelineLayout layout;
     VkRenderPass renderpass;
     std::vector<VkFramebuffer> framebuffers;
@@ -164,6 +165,7 @@ private:
     VkSampler textureSampler;
     VkBuffer vertexBuffer;  
     VkDeviceMemory vertexBufferMemory;
+    VkDeviceSize vertexBufferSize;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
     std::vector<VkBuffer> uniformBuffers;

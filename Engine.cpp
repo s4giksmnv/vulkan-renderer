@@ -45,6 +45,7 @@ Engine::~Engine() {
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
     }
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(device, vertexBufferDescriptorSetLayout, nullptr);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
     vkDestroyBuffer(device, indexBuffer, nullptr);
     vkFreeMemory(device, indexBufferMemory, nullptr);
@@ -125,7 +126,7 @@ void Engine::run() {
                 vkCmdBindPipeline(graphicsCmdBuffer[currFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
                 VkBuffer vertexBuffers[] = {vertexBuffer};
                 VkDeviceSize offsets[] = {0};
-                vkCmdBindVertexBuffers(graphicsCmdBuffer[currFrame], 0, 1, vertexBuffers, offsets);
+                // vkCmdBindVertexBuffers(graphicsCmdBuffer[currFrame], 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(graphicsCmdBuffer[currFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
                 VkViewport viewport{};
@@ -142,6 +143,25 @@ void Engine::run() {
                 vkCmdSetScissor(graphicsCmdBuffer[currFrame], 0, 1, &scissor);
 
                 updateUniformBuffers();
+
+                VkDescriptorBufferInfo vertexBufferInfo{};
+                vertexBufferInfo.buffer = vertexBuffer;
+                vertexBufferInfo.offset = 0;
+                vertexBufferInfo.range = VK_WHOLE_SIZE;
+                VkWriteDescriptorSet writeBuffer{};
+                writeBuffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writeBuffer.dstBinding = 0;
+                writeBuffer.dstArrayElement = 0;
+                writeBuffer.descriptorCount = 1;
+                writeBuffer.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writeBuffer.pBufferInfo = &vertexBufferInfo;
+                PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR = 
+                    (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(device, "vkCmdPushDescriptorSetKHR");
+                if (!vkCmdPushDescriptorSetKHR) {
+                    throw std::runtime_error("Failed to load vkCmdPushDescriptorSetKHR function");
+                }
+                vkCmdPushDescriptorSetKHR(graphicsCmdBuffer[currFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1, 1, &writeBuffer);
+
                 // descriptor sets are not unique to graphics pipeline, so we need to specify the pipeline
                 vkCmdBindDescriptorSets(graphicsCmdBuffer[currFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, 
                     &descriptorSets[currFrame], 0, nullptr);
@@ -285,7 +305,6 @@ void Engine::createDevice() {
         if (isDeviceSuitable(device)) {
             pDevice = device;
             msaaSamples = getMaxSampleCount();
-            msaaSamples = VK_SAMPLE_COUNT_2_BIT;
             break;
         }
     }
@@ -319,7 +338,8 @@ void Engine::createDevice() {
     }
 
     std::vector<const char*> extensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
     };
     deviceInfo.enabledExtensionCount = extensions.size();
     deviceInfo.ppEnabledExtensionNames = extensions.data();
@@ -391,12 +411,12 @@ void Engine::createDescriptorSetLayout() {
     // descriptor set itself describes actual data, i.e how framebuffer has actual image views
 
     // we need to provide details about each binding
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorCount = 1; // might be an array of uniforms of the same type, i.e array of buffers
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr; // image sampling descriptors
+    VkDescriptorSetLayoutBinding uniformBufferLayoutBinding{};
+    uniformBufferLayoutBinding.binding = 0;
+    uniformBufferLayoutBinding.descriptorCount = 1; // might be an array of uniforms of the same type, i.e array of buffers
+    uniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uniformBufferLayoutBinding.pImmutableSamplers = nullptr; // image sampling descriptors
 
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
     samplerLayoutBinding.binding = 1;
@@ -405,13 +425,28 @@ void Engine::createDescriptorSetLayout() {
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
 
-    VkDescriptorSetLayoutBinding bindings[] = {uboLayoutBinding, samplerLayoutBinding};
+    VkDescriptorSetLayoutBinding vertexBufferLayoutBinding{};
+    vertexBufferLayoutBinding.binding = 0;
+    vertexBufferLayoutBinding.descriptorCount = 1;
+    vertexBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    vertexBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    vertexBufferLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutBinding bindings[] = {uniformBufferLayoutBinding, samplerLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = sizeof(bindings)/sizeof(bindings[0]);
     layoutInfo.pBindings = bindings;
+    layoutInfo.flags = 0;
     VK_CHECK(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout));
+
+    VkDescriptorSetLayoutCreateInfo vertexBufferLayoutInfo{};
+    vertexBufferLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    vertexBufferLayoutInfo.bindingCount = 1;
+    vertexBufferLayoutInfo.pBindings = &vertexBufferLayoutBinding;
+    vertexBufferLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+    VK_CHECK(vkCreateDescriptorSetLayout(device, &vertexBufferLayoutInfo, nullptr, &vertexBufferDescriptorSetLayout));
 }
 void Engine::createGraphicsPipeline() {
     std::vector<char> vertCode = readFile("../shader.vert.spv");
@@ -437,13 +472,13 @@ void Engine::createGraphicsPipeline() {
 
     // how to treat incoming data
     VkPipelineVertexInputStateCreateInfo vInputInfo{};
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescription = Vertex::getAttributeDescription();
+    // auto bindingDescription = Vertex::getBindingDescription();
+    // auto attributeDescription = Vertex::getAttributeDescription();
     vInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
-    vInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
-    vInputInfo.vertexBindingDescriptionCount = 1;
-    vInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    // vInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
+    // vInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
+    // vInputInfo.vertexBindingDescriptionCount = 1;
+    // vInputInfo.pVertexBindingDescriptions = &bindingDescription;
 
     // what kind of geometry to draw and how to order vertices
     VkPipelineInputAssemblyStateCreateInfo assembleInfo{};
@@ -498,8 +533,9 @@ void Engine::createGraphicsPipeline() {
     // layout used to pass uniform values and push constants into shaders
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts = &descriptorSetLayout;
+    layoutInfo.setLayoutCount = 2;
+    VkDescriptorSetLayout descriptorSetLayouts[] = {descriptorSetLayout, vertexBufferDescriptorSetLayout};
+    layoutInfo.pSetLayouts = descriptorSetLayouts;
     layoutInfo.pushConstantRangeCount = 0;
     layoutInfo.pPushConstantRanges = nullptr;
     VK_CHECK(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &layout)); 
@@ -766,7 +802,7 @@ void Engine::createVertexBuffer() {
     vkUnmapMemory(device, stagingBufferMemory);
 
     // VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT is not accessible from CPU, so we can't use vkMapMemory
-    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         vertexBuffer, vertexBufferMemory);
 
     copyBuffer(stagingBuffer, vertexBuffer, size);
