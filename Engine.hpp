@@ -3,10 +3,10 @@
 
 struct Vertex {
     glm::vec3 pos;
-    glm::vec3 color;
+    glm::vec<3, uint8_t, glm::defaultp> normal;
     glm::vec2 texCoord;
     bool operator==(const Vertex& other) const {
-        return pos == other.pos && color == other.color && texCoord == other.texCoord;
+        return pos == other.pos && normal == other.normal && texCoord == other.texCoord;
     }
 
     // basically describes the vertex buffer
@@ -28,7 +28,7 @@ struct Vertex {
         attribute[1].binding = 0;
         attribute[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         attribute[1].location = 1;
-        attribute[1].offset = offsetof(Vertex, color);
+        attribute[1].offset = offsetof(Vertex, normal);
 
         attribute[2].binding = 0;
         attribute[2].format = VK_FORMAT_R32G32_SFLOAT;
@@ -42,7 +42,7 @@ namespace std {
     template<> struct hash<Vertex> {
         size_t operator()(Vertex const& vertex) const {
             return ((hash<glm::vec3>()(vertex.pos) ^
-                   (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                   (hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^
                    (hash<glm::vec2>()(vertex.texCoord) << 1);
         }
     };

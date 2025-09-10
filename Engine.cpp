@@ -244,7 +244,11 @@ void Engine::loadModel() {
                 attrib.texcoords[2 * index.texcoord_index + 0],
                 1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
             };
-            vertex.color = {1.0f, 1.0f, 1.0f};
+            vertex.normal = {
+                attrib.normals[3 * index.normal_index + 0],
+                attrib.normals[3 * index.normal_index + 1],
+                attrib.normals[3 * index.normal_index + 2],
+            };
 
             if (uniqueVertices.count(vertex) == 0) {
                 uniqueVertices[vertex] = vertices.size();
@@ -312,13 +316,16 @@ void Engine::createDevice() {
     
     VkDeviceCreateInfo deviceInfo{};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    VkPhysicalDeviceFeatures features;
-    features.geometryShader = VK_TRUE;
-    features.samplerAnisotropy = VK_TRUE;
-    features.sampleRateShading = VK_TRUE;
-    VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeature{};
-    dynamicRenderingFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-    dynamicRenderingFeature.dynamicRendering = VK_TRUE;
+    VkPhysicalDeviceFeatures2 features{};
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features.features.geometryShader = VK_TRUE;
+    features.features.samplerAnisotropy = VK_TRUE;
+    features.features.sampleRateShading = VK_TRUE;
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.shaderInt8 = VK_TRUE;
+    features12.uniformAndStorageBuffer8BitAccess = VK_TRUE;
+    features.pNext = &features12;
 
     queueFamilies = getQueueFamilies(pDevice);
     std::set<uint32_t> uniqueQueueFamilies = {
@@ -339,14 +346,14 @@ void Engine::createDevice() {
 
     std::vector<const char*> extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+        VK_KHR_8BIT_STORAGE_EXTENSION_NAME
     };
     deviceInfo.enabledExtensionCount = extensions.size();
     deviceInfo.ppEnabledExtensionNames = extensions.data();
     deviceInfo.pQueueCreateInfos = queueInfos.data();
     deviceInfo.queueCreateInfoCount = queueInfos.size();
-    deviceInfo.pEnabledFeatures = &features;
-    deviceInfo.pNext = &dynamicRenderingFeature;
+    deviceInfo.pNext = &features;
 
     VK_CHECK(vkCreateDevice(pDevice, &deviceInfo, nullptr, &device));
 
