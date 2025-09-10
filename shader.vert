@@ -23,7 +23,7 @@ layout(location = 1) out vec2 fragTexCoord;
 void main() {
     Vertex vertex = vertices[gl_VertexIndex];
     vec3 inPosition = vec3(vertex.vx, vertex.vy, vertex.vz);
-    vec3 inNormal = vec3(vertex.nx, vertex.ny, vertex.nz);
+    vec3 inNormal = normalize(vec3(vertex.nx, vertex.ny, vertex.nz));
     vec2 inTexCoord = vec2(vertex.tu, vertex.tv);
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
     fragNormal = inNormal;
