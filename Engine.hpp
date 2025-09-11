@@ -2,11 +2,13 @@
 #include "config.hpp"
 
 struct Vertex {
-    glm::vec3 pos;
-    glm::vec<3, uint8_t, glm::defaultp> normal;
-    glm::vec2 texCoord;
+    float x, y, z;
+    uint8_t nx, ny, nz, nw;
+    float tx, ty;
     bool operator==(const Vertex& other) const {
-        return pos == other.pos && normal == other.normal && texCoord == other.texCoord;
+        return x == other.x && y == other.y && z == other.z && 
+            nx == other.nx && ny == other.ny && nz == other.nz &&
+            tx == other.tx && ty == other.ty;
     }
 
     // basically describes the vertex buffer
@@ -23,17 +25,17 @@ struct Vertex {
         attribute[0].binding = 0;
         attribute[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attribute[0].location = 0; // location references location directive of the input in VS
-        attribute[0].offset = offsetof(Vertex, pos);
+        attribute[0].offset = offsetof(Vertex, x);
 
         attribute[1].binding = 0;
         attribute[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         attribute[1].location = 1;
-        attribute[1].offset = offsetof(Vertex, normal);
+        attribute[1].offset = offsetof(Vertex, nx);
 
         attribute[2].binding = 0;
         attribute[2].format = VK_FORMAT_R32G32_SFLOAT;
         attribute[2].location = 2;
-        attribute[2].offset = offsetof(Vertex, texCoord);
+        attribute[2].offset = offsetof(Vertex, tx);
 
         return attribute;
     }
@@ -41,9 +43,9 @@ struct Vertex {
 namespace std {
     template<> struct hash<Vertex> {
         size_t operator()(Vertex const& vertex) const {
-            return ((hash<glm::vec3>()(vertex.pos) ^
-                   (hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^
-                   (hash<glm::vec2>()(vertex.texCoord) << 1);
+            return ((hash<glm::vec3>()(glm::vec3(vertex.x, vertex.y, vertex.z)) ^
+                   (hash<glm::vec3>()(glm::vec3(vertex.nx, vertex.ny, vertex.nz)) << 1)) >> 1) ^
+                   (hash<glm::vec2>()(glm::vec2(vertex.tx, vertex.ty)) << 1);
         }
     };
 }

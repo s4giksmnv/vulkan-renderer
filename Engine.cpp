@@ -235,22 +235,21 @@ void Engine::loadModel() {
     for (const auto& shape : shapes) {
         for (const auto& index : shape.mesh.indices) {
             Vertex vertex{};
-            vertex.pos = {
-                attrib.vertices[3 * index.vertex_index + 0],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
-            };
-            vertex.texCoord = {
-                attrib.texcoords[2 * index.texcoord_index + 0],
-                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-            };
+            vertex.x = attrib.vertices[3 * index.vertex_index + 0];
+            vertex.y = attrib.vertices[3 * index.vertex_index + 1];
+            vertex.z = attrib.vertices[3 * index.vertex_index + 2];  
+            vertex.tx = attrib.texcoords[2 * index.texcoord_index + 0];
+            vertex.ty = 1.0f - attrib.texcoords[2 * index.texcoord_index + 1];
             glm::vec3 normal = {
                 attrib.normals[3 * index.normal_index + 0],
                 attrib.normals[3 * index.normal_index + 1],
                 attrib.normals[3 * index.normal_index + 2],
             };
-            vertex.normal = glm::normalize(normal);
-
+            normal = glm::normalize(normal);
+            // input float is [-1, 1], we need to convert it to [0, 255] to fit into uint8_t
+            vertex.nx = uint8_t((normal.x*0.5f+0.5f)*255.0f);
+            vertex.ny = uint8_t((normal.y*0.5f+0.5f)*255.0f);
+            vertex.nz = uint8_t((normal.z*0.5f+0.5f)*255.0f);
             if (uniqueVertices.count(vertex) == 0) {
                 uniqueVertices[vertex] = vertices.size();
                 vertices.push_back(vertex);
